@@ -1,4 +1,4 @@
-// [[file:~/Workspace/Programming/gosh-rs/optim/optim.note::*imports][imports:1]]
+// [[file:../optim.note::*imports][imports:1]]
 use gosh_core::*;
 
 use gosh_model::{ChemicalModel, ModelProperties};
@@ -8,7 +8,7 @@ use gut::prelude::*;
 use vecfx::*;
 // imports:1 ends here
 
-// [[file:~/Workspace/Programming/gosh-rs/optim/optim.note::*base][base:1]]
+// [[file:../optim.note::*base][base:1]]
 /// A generic interface for geometry optimization of Molecule.
 pub struct Optimizer {
     fmax: f64,
@@ -21,6 +21,13 @@ impl Default for Optimizer {
     }
 }
 
+impl Optimizer {
+    /// New optimizer with max step (nmax) and max force (fmax) in iterations.
+    pub fn new(nmax: usize, fmax: f64) -> Self {
+        Self { fmax, nmax }
+    }
+}
+
 /// A helper struct containing information on optimization.
 pub struct Optimized {
     /// The number of iterations in Optimzation loop.
@@ -30,7 +37,7 @@ pub struct Optimized {
 }
 // base:1 ends here
 
-// [[file:~/Workspace/Programming/gosh-rs/optim/optim.note::*pub][pub:1]]
+// [[file:../optim.note::*pub][pub:1]]
 impl Optimizer {
     /// Optimize geometry of `mol` in potential provided by `model`.
     ///
@@ -48,7 +55,7 @@ impl Optimizer {
         let mut x_init_masked = mask.apply(&coords);
         let mut computed = None;
         let mut opt = lbfgs::lbfgs()
-            .with_max_evaluations(100)
+            .with_max_evaluations(500)
             .with_initial_step_size(1.0 / 75.0)
             .with_max_step_size(0.1)
             .with_gradient_only()
@@ -74,8 +81,8 @@ impl Optimizer {
             let state = opt.propagate()?;
             let fmax = state.gx.chunks(3).map(|v| v.vec2norm()).float_max();
             println!("iter {:4}\tEnergy = {:-12.3}\tfmax={}", i, state.fx, fmax);
+            niter = i;
             if fmax < self.fmax {
-                niter = i;
                 break;
             }
         }
@@ -88,7 +95,7 @@ impl Optimizer {
 }
 // pub:1 ends here
 
-// [[file:~/Workspace/Programming/gosh-rs/optim/optim.note::*test][test:1]]
+// [[file:../optim.note::*test][test:1]]
 #[test]
 fn test_opt() -> Result<()> {
     use gchemol::prelude::*;

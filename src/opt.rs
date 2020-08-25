@@ -64,7 +64,7 @@ impl Optimizer {
             .with_linesearch_gtol(0.999)
             .build(&mut x_init_masked, |x_masked, gx_masked| {
                 let positions = mask.unmask(x_masked, 0.0).as_3d().to_owned();
-                mol.set_positions(positions);
+                mol.update_positions(positions);
                 let mp = model.compute(&mol)?;
                 let energy = mp.get_energy().ok_or(format_err!("opt: no energy"))?;
                 let forces = mp.get_forces().ok_or(format_err!("opt: no forces"))?;

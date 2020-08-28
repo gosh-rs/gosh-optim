@@ -30,9 +30,11 @@ impl Optimizer {
 
 /// A helper struct containing information on optimization.
 pub struct Optimized {
-    /// The number of iterations in Optimzation loop.
+    /// The number of iterations in optimzation loop.
     pub niter: usize,
-    /// Final computed properties in ChemicalModel
+    /// Final fmax criterion for forces.
+    pub fmax: f64,
+    /// Final computed properties in ChemicalModel.
     pub computed: ModelProperties,
 }
 // base:1 ends here
@@ -69,26 +71,33 @@ impl Optimizer {
                 let energy = mp.get_energy().ok_or(format_err!("opt: no energy"))?;
                 let forces = mp.get_forces().ok_or(format_err!("opt: no forces"))?;
                 let forces = mask.apply(forces.as_flat());
-                gx_masked.vecncpy(&forces);
+                debug!("evaluate PES");
 
+                gx_masked.vecncpy(&forces);
                 // save for returning
                 computed = Some(mp);
                 Ok(energy)
             })?;
 
         let mut niter = 0;
+        let mut fmax = std::f64::NAN;
         for i in 0..self.nmax {
             let state = opt.propagate()?;
-            let fmax = state.gx.chunks(3).map(|v| v.vec2norm()).float_max();
-            println!("iter {:4}\tEnergy = {:-12.3}\tfmax={}", i, state.fx, fmax);
+            fmax = state.gx.chunks(3).map(|v| v.vec2norm()).float_max();
+            println!("iter {:4}\tEnergy = {:-12.4}\tfmax={}", i, state.fx, fmax);
             niter = i;
             if fmax < self.fmax {
+                info!("forces converged: {}", fmax);
                 break;
             }
         }
 
         let mp = computed.ok_or(format_err!("model was not computed"))?;
-        let optimized = Optimized { niter, computed: mp };
+        let optimized = Optimized {
+            niter,
+            fmax,
+            computed: mp,
+        };
 
         Ok(optimized)
     }

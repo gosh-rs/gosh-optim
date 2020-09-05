@@ -52,17 +52,18 @@ impl Optimizer {
     ///
     /// Returns the computed `ModelProperties` on success in final geometry.
     pub fn optimize_geometry<M: ChemicalModel>(&self, mol: &mut Molecule, model: &mut M) -> Result<Optimized> {
+        let vars = crate::vars::Vars::from_env();
         let coords = mol.positions().collect_vec().concat();
         let mask = mol.freezing_coords_mask();
         let mut x_init_masked = mask.apply(&coords);
         let mut computed = None;
         let mut opt = lbfgs::lbfgs()
-            .with_max_evaluations(500)
-            .with_initial_step_size(1.0 / 75.0)
-            .with_max_step_size(0.1)
+            .with_max_evaluations(vars.max_evaluations)
+            .with_initial_step_size(vars.initial_step_size)
+            .with_max_step_size(vars.max_step_size)
+            .with_max_linesearch(vars.max_linesearch)
             .with_gradient_only()
             .with_damping(true)
-            .with_max_linesearch(1)
             .with_linesearch_gtol(0.999)
             .build(&mut x_init_masked, |x_masked, gx_masked| {
                 let positions = mask.unmask(x_masked, 0.0).as_3d().to_owned();
@@ -82,9 +83,9 @@ impl Optimizer {
         let mut niter = 0;
         let mut fmax = std::f64::NAN;
         for i in 0..self.nmax {
-            let state = opt.propagate()?;
-            fmax = state.gx.chunks(3).map(|v| v.vec2norm()).float_max();
-            println!("iter {:4}\tEnergy = {:-12.4}\tfmax={}", i, state.fx, fmax);
+            let progress = opt.propagate()?;
+            fmax = progress.gx.chunks(3).map(|v| v.vec2norm()).float_max();
+            println!("iter {:4}\tEnergy = {:-12.4}\tfmax={}", i, progress.fx, fmax);
             niter = i;
             if fmax < self.fmax {
                 info!("forces converged: {}", fmax);

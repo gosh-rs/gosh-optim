@@ -1,7 +1,7 @@
-# [[file:~/Workspace/Programming/gosh-rs/optim/optim.note::*cargo][cargo:1]]
+# [[file:optim.note::*cargo][cargo:1]]
 [package]
 name = "gosh-optim"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2018"
 authors = ["Wenping Guo <ybyygu@gmail.com>"]
 
@@ -9,6 +9,9 @@ authors = ["Wenping Guo <ybyygu@gmail.com>"]
 gosh-core = { version = ">=0.0.1", features=["adhoc"] }
 gosh-model = { version = ">=0.0.11", features=["adhoc"] }
 lbfgs = {version = "0.0.16", package="liblbfgs"}
+fire = {path = "../../gosh-rs/fire"}
+envy = "0.4"
+serde = {version="1", features = ["derive"]}
 
 [dev-dependencies]
 # cargo:1 ends here

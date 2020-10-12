@@ -68,14 +68,16 @@ impl Optimizer {
             .build(&mut x_init_masked, |x_masked, gx_masked| {
                 let positions = mask.unmask(x_masked, 0.0).as_3d().to_owned();
                 mol.update_positions(positions);
-                let mp = model.compute(&mol)?;
+                let mut mp = model.compute(&mol)?;
                 let energy = mp.get_energy().ok_or(format_err!("opt: no energy"))?;
                 let forces = mp.get_forces().ok_or(format_err!("opt: no forces"))?;
                 let forces = mask.apply(forces.as_flat());
-                debug!("evaluate PES");
+                trace!("opt: evaluate PES");
 
                 gx_masked.vecncpy(&forces);
                 // save for returning
+                // make sure `ModelProperties` contains correct version of `Molecule`
+                mp.set_molecule(mol.clone());
                 computed = Some(mp);
                 Ok(energy)
             })?;

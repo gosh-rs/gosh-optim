@@ -22,8 +22,8 @@ impl Default for Optimizer {
 }
 
 impl Optimizer {
-    /// New optimizer with max step (nmax) and max force (fmax) in iterations.
-    pub fn new(nmax: usize, fmax: f64) -> Self {
+    /// New optimizer with max force (fmax) and max step (nmax) in iterations.
+    pub fn new(fmax: f64, nmax: usize) -> Self {
         Self { fmax, nmax }
     }
 }

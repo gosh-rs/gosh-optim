@@ -9,22 +9,39 @@ use vecfx::*;
 // imports:1 ends here
 
 // [[file:../optim.note::*base][base:1]]
+use gosh_database::CheckpointDb;
+
 /// A generic interface for geometry optimization of Molecule.
 pub struct Optimizer {
     fmax: f64,
     nmax: usize,
+    ckpt: Option<CheckpointDb>,
 }
 
 impl Default for Optimizer {
     fn default() -> Self {
-        Self { fmax: 0.1, nmax: 100 }
+        Self {
+            fmax: 0.1,
+            nmax: 100,
+            ckpt: None,
+        }
     }
 }
 
 impl Optimizer {
     /// New optimizer with max force (fmax) and max step (nmax) in iterations.
     pub fn new(fmax: f64, nmax: usize) -> Self {
-        Self { fmax, nmax }
+        Self {
+            fmax,
+            nmax,
+            ..Self::default()
+        }
+    }
+
+    /// Set checkpoint for resuming optimization later
+    pub fn checkpoint(mut self, ckpt: CheckpointDb) -> Self {
+        self.ckpt = ckpt.into();
+        self
     }
 }
 
@@ -45,8 +62,10 @@ pub struct Optimized {
 pub struct OptimizedIter {
     /// The number of calls for potential evaluation.
     pub ncalls: usize,
-    /// Current fmax criterion of forces.
+    /// Current fmax criterion of forces in optimization.
     pub fmax: f64,
+    /// Current energy in optimization.
+    pub energy: f64,
     /// Final computed properties in ChemicalModel.
     pub computed: ModelProperties,
 }
@@ -108,6 +127,7 @@ impl Optimizer {
                 fmax,
                 computed,
                 ncalls: progress.ncalls,
+                energy: progress.fx,
             }
         })
     }
@@ -127,116 +147,34 @@ impl Optimizer {
     ///
     /// Returns the computed `ModelProperties` on success in final geometry.
     pub fn optimize_geometry<M: ChemicalModel>(&self, mol: &mut Molecule, model: &mut M) -> Result<Optimized> {
-        let vars = crate::vars::Vars::from_env();
-        let coords = mol.positions().collect_vec().concat();
-        let mask = mol.freezing_coords_mask();
-        let mut x_init_masked = mask.apply(&coords);
-        let mut computed = None;
-        let mut opt = lbfgs::lbfgs()
-            .with_max_evaluations(vars.max_evaluations)
-            .with_initial_step_size(vars.initial_step_size)
-            .with_max_step_size(vars.max_step_size)
-            .with_max_linesearch(vars.max_linesearch)
-            .with_gradient_only()
-            .with_damping(true)
-            .with_linesearch_gtol(0.999)
-            .build(&mut x_init_masked, |x_masked, gx_masked| {
-                let positions = mask.unmask(x_masked, 0.0).as_3d().to_owned();
-                mol.update_positions(positions);
-                let mut mp = model.compute(&mol)?;
-                let energy = mp.get_energy().ok_or(format_err!("opt: no energy"))?;
-                let forces = mp.get_forces().ok_or(format_err!("opt: no forces"))?;
-                let forces = mask.apply(forces.as_flat());
-                trace!("opt: evaluate PES");
-
-                gx_masked.vecncpy(&forces);
-                // save for returning
-                // make sure `ModelProperties` contains correct version of `Molecule`
-                mp.set_molecule(mol.clone());
-                computed = Some(mp);
-                Ok(energy)
-            })?;
-
-        let mut niter = 0;
-        let mut fmax = std::f64::NAN;
-        for i in 0..self.nmax {
-            let progress = opt.propagate()?;
-            fmax = progress.gx.chunks(3).map(|v| v.vec2norm()).float_max();
-            println!("iter {:4}\tEnergy = {:-12.4}\tfmax={}", i, progress.fx, fmax);
-            niter = i;
-            if fmax < self.fmax {
-                info!("forces converged: {}", fmax);
-                break;
-            }
-        }
-
-        let mp = computed.ok_or(format_err!("model was not computed"))?;
-        let optimized = Optimized {
-            niter,
-            fmax,
-            computed: mp,
-        };
-
-        Ok(optimized)
-    }
-
-    pub fn optimize_geometry_checkpointed<M: ChemicalModel>(
-        &self,
-        mol: &mut Molecule,
-        model: &mut M,
-        ckpt: gosh_database::CheckpointDb,
-    ) -> Result<Optimized> {
-        let vars = crate::vars::Vars::from_env();
-
         // restore Molecule from ckpt
-        ckpt.restore(mol).context("restore optimized molecule from ckpt")?;
+        if let Some(ckpt) = &self.ckpt {
+            ckpt.restore(mol).context("restore optimized molecule from ckpt")?;
+        }
 
-        let coords = mol.positions().collect_vec().concat();
-        let mask = mol.freezing_coords_mask();
-        let mut x_init_masked = mask.apply(&coords);
+        let steps = Self::optimize_geometry_iter(mol, model);
+
         let mut computed = None;
-        let mut opt = lbfgs::lbfgs()
-            .with_max_evaluations(vars.max_evaluations)
-            .with_initial_step_size(vars.initial_step_size)
-            .with_max_step_size(vars.max_step_size)
-            .with_max_linesearch(vars.max_linesearch)
-            .with_gradient_only()
-            .with_damping(true)
-            .with_linesearch_gtol(0.999)
-            .build(&mut x_init_masked, |x_masked, gx_masked| {
-                let positions = mask.unmask(x_masked, 0.0).as_3d().to_owned();
-                mol.update_positions(positions);
-                let mut mp = model.compute(&mol)?;
-                let energy = mp.get_energy().ok_or(format_err!("opt: no energy"))?;
-                let forces = mp.get_forces().ok_or(format_err!("opt: no forces"))?;
-                let forces = mask.apply(forces.as_flat());
-                trace!("opt: evaluate PES");
-
-                gx_masked.vecncpy(&forces);
-                // save for returning
-                // make sure `ModelProperties` contains correct version of `Molecule`
-                mp.set_molecule(mol.clone());
-
-                // checkpointing
-                ckpt.commit(mol);
-
-                computed = Some(mp);
-                Ok(energy)
-            })?;
-
         let mut niter = 0;
         let mut fmax = std::f64::NAN;
-        for i in 0..self.nmax {
-            let progress = opt.propagate()?;
-            fmax = progress.gx.chunks(3).map(|v| v.vec2norm()).float_max();
-            println!("iter {:4}\tEnergy = {:-12.4}\tfmax={}", i, progress.fx, fmax);
+        for (progress, i) in steps.take(self.nmax).zip(1..) {
+            // checkpointing
+            if let Some(ckpt) = &self.ckpt {
+                let mol = progress.computed.get_molecule().expect("no mol in mp");
+                ckpt.commit(mol);
+            }
+
             niter = i;
+            fmax = progress.fmax;
+            computed = progress.computed.into();
+            println!("iter {:4}\tEnergy = {:-12.4}\tfmax={}", i, progress.energy, fmax);
             if fmax < self.fmax {
                 info!("forces converged: {}", fmax);
                 break;
             }
         }
 
+        // FIXME: it is better to use `OptimizedIter`?
         let mp = computed.ok_or(format_err!("model was not computed"))?;
         let optimized = Optimized {
             niter,

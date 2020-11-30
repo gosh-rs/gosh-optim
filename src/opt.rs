@@ -39,6 +39,81 @@ pub struct Optimized {
 }
 // base:1 ends here
 
+// [[file:../optim.note::*iter][iter:1]]
+#[derive(Debug, Clone)]
+/// A helper struct containing information on optimization.
+pub struct OptimizedIter {
+    /// The number of calls for potential evaluation.
+    pub ncalls: usize,
+    /// Current fmax criterion of forces.
+    pub fmax: f64,
+    /// Final computed properties in ChemicalModel.
+    pub computed: ModelProperties,
+}
+
+impl Optimizer {
+    /// Optimize geometry of `mol` in potential provided by `model` (iterator version).
+    ///
+    /// # Parameters
+    ///
+    /// * mol: target molecule
+    /// * model: chemical model for evaluation energy and forces of `mol` at new positions.
+    ///
+    /// # Return
+    ///
+    /// Returns an iterator over optimization steps containing computed `ModelProperties`.
+    pub fn optimize_geometry_iter<'a, M: ChemicalModel>(
+        mol: &'a mut Molecule,
+        model: &'a mut M,
+    ) -> impl Iterator<Item = OptimizedIter> + 'a {
+        let vars = crate::vars::Vars::from_env();
+        let coords = mol.positions().collect_vec().concat();
+        let mask = mol.freezing_coords_mask();
+        let mut x_init_masked = mask.apply(&coords);
+
+        let mut opt = lbfgs::lbfgs_iter()
+            .with_max_evaluations(vars.max_evaluations)
+            .with_initial_step_size(vars.initial_step_size)
+            .with_max_step_size(vars.max_step_size)
+            .with_max_linesearch(vars.max_linesearch)
+            .with_gradient_only()
+            .with_damping(true)
+            .with_linesearch_gtol(0.999);
+
+        let steps = opt
+            .minimize(x_init_masked, move |x_masked: &[f64], o_masked: &mut lbfgs::Output| {
+                let positions = mask.unmask(x_masked, 0.0).as_3d().to_owned();
+                mol.update_positions(positions);
+                let mut mp = model.compute(&mol)?;
+                let energy = mp.get_energy().ok_or(format_err!("opt: no energy"))?;
+                let forces = mp.get_forces().ok_or(format_err!("opt: no forces"))?;
+                let forces = mask.apply(forces.as_flat());
+                trace!("opt: evaluate PES");
+
+                o_masked.gx.vecncpy(&forces);
+                o_masked.fx = energy;
+
+                // save for returning
+                // make sure `ModelProperties` contains correct version of `Molecule`
+                mp.set_molecule(mol.clone());
+
+                let fmax = forces.chunks(3).map(|v| v.vec2norm()).float_max();
+                Ok((fmax, mp))
+            })
+            .unwrap();
+
+        steps.map(|progress| {
+            let (fmax, computed) = progress.data;
+            OptimizedIter {
+                fmax,
+                computed,
+                ncalls: progress.ncalls,
+            }
+        })
+    }
+}
+// iter:1 ends here
+
 // [[file:../optim.note::*pub][pub:1]]
 impl Optimizer {
     /// Optimize geometry of `mol` in potential provided by `model`.
@@ -187,6 +262,11 @@ fn test_opt() -> Result<()> {
 
     let _ = Optimizer::default().optimize_geometry(&mut mol, &mut lj)?;
 
+    // iterator interface
+    let steps = Optimizer::optimize_geometry_iter(&mut mol, &mut lj);
+    for p in steps.take(10) {
+        dbg!(p.fmax, p.ncalls);
+    }
     Ok(())
 }
 // test:1 ends here

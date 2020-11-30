@@ -4,7 +4,7 @@ use serde::*;
 use gosh_core::gut::prelude::*;
 // imports:1 ends here
 
-// [[file:../optim.note::*impl][impl:1]]
+// [[file:../optim.note::*base][base:1]]
 #[derive(Deserialize, Debug, Clone)]
 #[serde(default)]
 pub(crate) struct Vars {
@@ -43,4 +43,4 @@ impl Vars {
         }
     }
 }
-// impl:1 ends here
+// base:1 ends here

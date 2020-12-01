@@ -16,6 +16,7 @@ pub struct Optimizer {
     fmax: f64,
     nmax: usize,
     ckpt: Option<CheckpointDb>,
+    vars: crate::vars::Vars,
 }
 
 impl Default for Optimizer {
@@ -24,6 +25,7 @@ impl Default for Optimizer {
             fmax: 0.1,
             nmax: 100,
             ckpt: None,
+            vars: crate::vars::Vars::from_env(),
         }
     }
 }
@@ -56,18 +58,49 @@ pub struct Optimized {
 }
 // base:1 ends here
 
+// [[file:../optim.note::*trait][trait:1]]
+/// A helper struct represents the output data required for molecular geometry
+/// optimization.
+pub struct Output {
+    pub energy: Option<f64>,
+    pub forces: Option<Vec<[f64; 3]>>,
+}
+
+pub trait OptimizeMolecule<U> {
+    fn evaluate(&mut self, mol: &Molecule, out: &mut Output) -> Result<U>;
+}
+
+impl<T> OptimizeMolecule<ModelProperties> for T
+where
+    T: ChemicalModel,
+{
+    fn evaluate(&mut self, mol: &Molecule, out: &mut Output) -> Result<ModelProperties> {
+        trace!("opt: evaluate PES");
+        let mut mp = self.compute(&mol)?;
+
+        // save for returning
+        // make sure `ModelProperties` contains correct version of `Molecule`
+        mp.set_molecule(mol.clone());
+        out.energy = mp.get_energy();
+        out.forces = mp.get_forces().cloned();
+
+        Ok(mp)
+    }
+}
+// trait:1 ends here
+
 // [[file:../optim.note::*iter][iter:1]]
 #[derive(Debug, Clone)]
 /// A helper struct containing information on optimization.
-pub struct OptimizedIter {
+pub struct OptimizedIter<U> {
     /// The number of calls for potential evaluation.
     pub ncalls: usize,
     /// Current fmax criterion of forces in optimization.
     pub fmax: f64,
     /// Current energy in optimization.
     pub energy: f64,
-    /// Final computed properties in ChemicalModel.
-    pub computed: ModelProperties,
+    /// Extra data returned from user defined OptimizeMolecule trait method
+    pub extra: U,
 }
 
 impl Optimizer {
@@ -80,12 +113,16 @@ impl Optimizer {
     ///
     /// # Return
     ///
-    /// Returns an iterator over optimization steps containing computed `ModelProperties`.
-    pub fn optimize_geometry_iter<'a, M: ChemicalModel>(
+    /// Returns an iterator over optimization steps
+    pub fn optimize_geometry_iter<'a, M, U: 'a>(
         mol: &'a mut Molecule,
         model: &'a mut M,
-    ) -> impl Iterator<Item = OptimizedIter> + 'a {
+    ) -> impl Iterator<Item = OptimizedIter<U>> + 'a
+    where
+        M: OptimizeMolecule<U>,
+    {
         let vars = crate::vars::Vars::from_env();
+        dbg!(&vars);
         let coords = mol.positions().collect_vec().concat();
         let mask = mol.freezing_coords_mask();
         let mut x_init_masked = mask.apply(&coords);
@@ -103,18 +140,18 @@ impl Optimizer {
             .minimize(x_init_masked, move |x_masked: &[f64], o_masked: &mut lbfgs::Output| {
                 let positions = mask.unmask(x_masked, 0.0).as_3d().to_owned();
                 mol.update_positions(positions);
-                let mut mp = model.compute(&mol)?;
-                let energy = mp.get_energy().ok_or(format_err!("opt: no energy"))?;
-                let forces = mp.get_forces().ok_or(format_err!("opt: no forces"))?;
+                let mut out = Output {
+                    energy: None,
+                    forces: None,
+                };
+                let mut mp = model.evaluate(&mol, &mut out)?;
+                let energy = out.energy.expect("evaluate: forget to set energy?");
+                let forces = out.forces.as_ref().expect("evaluate: forget to set forces?");
                 let forces = mask.apply(forces.as_flat());
                 trace!("opt: evaluate PES");
 
                 o_masked.gx.vecncpy(&forces);
                 o_masked.fx = energy;
-
-                // save for returning
-                // make sure `ModelProperties` contains correct version of `Molecule`
-                mp.set_molecule(mol.clone());
 
                 let fmax = forces.chunks(3).map(|v| v.vec2norm()).float_max();
                 Ok((fmax, mp))
@@ -122,10 +159,10 @@ impl Optimizer {
             .unwrap();
 
         steps.map(|progress| {
-            let (fmax, computed) = progress.data;
+            let (fmax, extra) = progress.extra;
             OptimizedIter {
                 fmax,
-                computed,
+                extra,
                 ncalls: progress.ncalls,
                 energy: progress.fx,
             }
@@ -160,13 +197,13 @@ impl Optimizer {
         for (progress, i) in steps.take(self.nmax).zip(1..) {
             // checkpointing
             if let Some(ckpt) = &self.ckpt {
-                let mol = progress.computed.get_molecule().expect("no mol in mp");
+                let mol = progress.extra.get_molecule().expect("no mol in mp");
                 ckpt.commit(mol);
             }
 
             niter = i;
             fmax = progress.fmax;
-            computed = progress.computed.into();
+            computed = progress.extra.into();
             println!("iter {:4}\tEnergy = {:-12.4}\tfmax={}", i, progress.energy, fmax);
             if fmax < self.fmax {
                 info!("forces converged: {}", fmax);

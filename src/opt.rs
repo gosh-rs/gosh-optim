@@ -156,7 +156,7 @@ impl Optimizer {
                 let fmax = forces.chunks(3).map(|v| v.vec2norm()).float_max();
                 Ok((fmax, mp))
             })
-            .unwrap();
+            .expect("optimize_geometry_iter");
 
         steps.map(|progress| {
             let (fmax, extra) = progress.extra;

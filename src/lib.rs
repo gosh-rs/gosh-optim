@@ -3,6 +3,6 @@ mod opt;
 mod vars;
 // mods:1 ends here
 
-// [[file:../optim.note::*exports][exports:1]]
+// [[file:../optim.note::*pub][pub:1]]
 pub use opt::*;
-// exports:1 ends here
+// pub:1 ends here

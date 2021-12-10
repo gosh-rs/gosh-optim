@@ -9,8 +9,8 @@
 /// let mut pot = Dynamics::new(&x, f);
 /// let d = [0.2; 5];
 /// pot.step_toward(&d);
-/// let fx = pot.energy();
-/// let gx = pot.gradient();
+/// let fx = pot.get_energy()?;
+/// let gx = pot.get_gradient()?;
 /// let fx_old = pot.get_last_energy();
 /// let gx_old = pot.get_last_gradient();
 /// pot.revert();
@@ -21,7 +21,7 @@
 use super::*;
 // cc2b4eb6 ends here
 
-// [[file:../optim.note::*base][base:1]]
+// [[file:../optim.note::9e96c6e5][9e96c6e5]]
 #[derive(Debug, Clone)]
 struct State {
     x: Vec<f64>,
@@ -32,7 +32,7 @@ struct State {
 #[derive(Clone, Debug)]
 pub struct Dynamics<E>
 where
-    E: FnMut(&[f64], &mut [f64]) -> f64, // positions, forces => energy
+    E: FnMut(&[f64], &mut [f64]) -> Result<f64>, // positions, forces => energy
 {
     f: E,
     state: State,
@@ -53,25 +53,25 @@ impl State {
         }
     }
 }
-// base:1 ends here
+// 9e96c6e5 ends here
 
 // [[file:../optim.note::51dd1513][51dd1513]]
 impl<E> Dynamics<E>
 where
-    E: FnMut(&[f64], &mut [f64]) -> f64,
+    E: FnMut(&[f64], &mut [f64]) -> Result<f64>,
 {
     /// evaluate energy and gradient at current position
-    fn eval(&mut self) -> (f64, &[f64]) {
+    fn eval(&mut self) -> Result<(f64, &[f64])> {
         let n = self.state.x.len();
 
         let gx: &mut [f64] = self.state.gx.get_or_insert(vec![0.0; n]);
         let x = &self.state.x;
-        let v = (self.f)(x, gx);
+        let v = (self.f)(x, gx)?;
         self.state.fx = Some(v);
 
         self.neval += 1;
 
-        (v, gx)
+        Ok((v, gx))
     }
 }
 // 51dd1513 ends here
@@ -79,7 +79,7 @@ where
 // [[file:../optim.note::1a2ff40a][1a2ff40a]]
 impl<E> Dynamics<E>
 where
-    E: FnMut(&[f64], &mut [f64]) -> f64,
+    E: FnMut(&[f64], &mut [f64]) -> Result<f64>,
 {
     /// Construct a Dynamics
     ///
@@ -109,22 +109,22 @@ where
         self.neval
     }
 
-    /// Return energy at current position.
+    /// Return energy at current position if ok.
     ///
     /// The function will be evaluated when necessary.
-    pub fn energy(&mut self) -> f64 {
+    pub fn get_energy(&mut self) -> Result<f64> {
         match self.state.fx {
             // found cached value.
-            Some(v) => v,
+            Some(v) => Ok(v),
             // first time calculation
             None => {
-                let (fx, _) = self.eval();
-                fx
+                let (fx, _) = self.eval()?;
+                Ok(fx)
             }
         }
     }
 
-    /// Return energy at previous positions
+    /// Return energy at previous position if any
     pub fn get_last_energy(&self) -> Option<f64> {
         let state = self.last_state.as_ref()?;
         state.fx
@@ -133,14 +133,14 @@ where
     /// Return a reference to gradient at current position.
     ///
     /// The function will be evaluated when necessary.
-    pub fn gradient(&mut self) -> &[f64] {
+    pub fn get_gradient(&mut self) -> Result<&[f64]> {
         match self.state.gx {
             // found cached value.
-            Some(ref gx) => gx,
+            Some(ref gx) => Ok(gx),
             // first time calculation
             None => {
-                let (_, gx) = self.eval();
-                gx
+                let (_, gx) = self.eval()?;
+                Ok(gx)
             }
         }
     }
@@ -203,7 +203,7 @@ where
 
 // [[file:../optim.note::aba130a2][aba130a2]]
 #[test]
-fn test_dynamics() {
+fn test_dynamics() -> Result<()> {
     use approx::*;
 
     const N: usize = 2;
@@ -213,11 +213,11 @@ fn test_dynamics() {
         for i in 0..N {
             g[i] = 2.0 * x[i];
         }
-        x.iter().map(|v| v.powi(2)).sum()
+        Ok(x.iter().map(|v| v.powi(2)).sum())
     };
 
     let mut pot = Dynamics::new(&x, f);
-    let fx = pot.energy();
+    let fx = pot.get_energy()?;
     assert_relative_eq!(fx, 0.0, epsilon = 1e-5);
     assert!(pot.get_last_energy().is_none());
 
@@ -226,10 +226,10 @@ fn test_dynamics() {
     assert_eq!(pot.ncalls(), 1);
     assert_eq!(pot.get_last_energy().unwrap(), 0.0);
 
-    let fx = pot.energy();
+    let fx = pot.get_energy()?;
     assert_relative_eq!(fx, 5.0, epsilon = 1e-5);
     assert_eq!(pot.ncalls(), 2);
-    let gx = pot.gradient();
+    let gx = pot.get_gradient()?;
     assert_relative_eq!(gx[0], 2.0, epsilon = 1e-5);
     assert_relative_eq!(gx[1], 4.0, epsilon = 1e-5);
     assert_eq!(pot.ncalls(), 2);
@@ -242,20 +242,10 @@ fn test_dynamics() {
 
     pot.revert();
     assert_eq!(pot.position(), &[1.0, 2.0]);
-    assert_eq!(pot.energy(), 5.0);
+    assert_eq!(pot.get_energy()?, 5.0);
     assert_eq!(pot.ncalls(), 2);
     assert_eq!(pot.get_last_energy().unwrap(), 5.0);
+
+    Ok(())
 }
 // aba130a2 ends here
-
-// [[file:../optim.note::709a65af][709a65af]]
-#[test]
-fn test_na() {
-    use na::Matrix;
-    use vecfx::nalgebra as na;
-    let a = [1.0, 2.0];
-    let b = na::DVectorSlice::from(a);
-    // let c = na::DVectorSlice::from_slice(&[2.0, 3.0], a.len());
-    // dbg!(b + c);
-}
-// 709a65af ends here

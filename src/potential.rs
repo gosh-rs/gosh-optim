@@ -9,10 +9,10 @@
 /// let mut pot = Dynamics::new(&x, f);
 /// let d = [0.2; 5];
 /// pot.step_toward(&d);
-/// let fx = pot.get_energy()?;
-/// let gx = pot.get_gradient()?;
-/// let fx_old = pot.get_last_energy();
-/// let gx_old = pot.get_last_gradient();
+/// let energy = pot.get_energy()?;
+/// let forces = pot.get_forces()?;
+/// let energy_old = pot.get_last_energy();
+/// let forces_old = pot.get_last_forces();
 /// pot.revert();
 /// ```
 // docs:2 ends here
@@ -25,8 +25,8 @@ use super::*;
 #[derive(Debug, Clone)]
 struct State {
     x: Vec<f64>,
-    fx: Option<f64>,
-    gx: Option<Vec<f64>>,
+    energy: Option<f64>,
+    forces: Option<Vec<f64>>,
 }
 
 #[derive(Clone, Debug)]
@@ -48,8 +48,8 @@ impl State {
     fn new(x: &[f64]) -> Self {
         Self {
             x: x.to_vec(),
-            fx: None,
-            gx: None,
+            energy: None,
+            forces: None,
         }
     }
 }
@@ -64,14 +64,14 @@ where
     fn eval(&mut self) -> Result<(f64, &[f64])> {
         let n = self.state.x.len();
 
-        let gx: &mut [f64] = self.state.gx.get_or_insert(vec![0.0; n]);
+        let forces: &mut [f64] = self.state.forces.get_or_insert(vec![0.0; n]);
         let x = &self.state.x;
-        let v = (self.f)(x, gx)?;
-        self.state.fx = Some(v);
+        let v = (self.f)(x, forces)?;
+        self.state.energy = Some(v);
 
         self.neval += 1;
 
-        Ok((v, gx))
+        Ok((v, forces))
     }
 }
 // 51dd1513 ends here
@@ -86,7 +86,7 @@ where
     /// # Parameters
     ///
     /// * x: initial position
-    /// * f: a closure for function evaluation of energy and gradient.
+    /// * f: a closure for evaluation of energy and forces at current position.
     pub fn new(x: &[f64], f: E) -> Self {
         Dynamics {
             f,
@@ -113,13 +113,13 @@ where
     ///
     /// The function will be evaluated when necessary.
     pub fn get_energy(&mut self) -> Result<f64> {
-        match self.state.fx {
+        match self.state.energy {
             // found cached value.
             Some(v) => Ok(v),
             // first time calculation
             None => {
-                let (fx, _) = self.eval()?;
-                Ok(fx)
+                let (energy, _) = self.eval()?;
+                Ok(energy)
             }
         }
     }
@@ -127,43 +127,44 @@ where
     /// Return energy at previous position if any
     pub fn get_last_energy(&self) -> Option<f64> {
         let state = self.last_state.as_ref()?;
-        state.fx
+        state.energy
     }
 
-    /// Return a reference to gradient at current position.
+    /// Return a reference to current forces.
     ///
-    /// The function will be evaluated when necessary.
-    pub fn get_gradient(&mut self) -> Result<&[f64]> {
-        match self.state.gx {
+    /// The potential will be evaluated when necessary.
+    pub fn get_forces(&mut self) -> Result<&[f64]> {
+        match self.state.forces {
             // found cached value.
-            Some(ref gx) => Ok(gx),
+            Some(ref forces) => Ok(forces),
             // first time calculation
             None => {
-                let (_, gx) = self.eval()?;
-                Ok(gx)
+                let (_, forces) = self.eval()?;
+                Ok(forces)
             }
         }
     }
 
-    pub fn get_last_gradient(&self) -> Option<&[f64]> {
+    /// Return a reference to forces at previous point.
+    pub fn get_last_forces(&self) -> Option<&[f64]> {
         let state = self.last_state.as_ref()?;
-        let gx = state.gx.as_ref()?;
-        Some(gx)
+        let forces = state.forces.as_ref()?;
+        Some(forces)
     }
 
-    /// Return a reference to current position vector.
-    pub fn position(&self) -> &[f64] {
+    /// Return a reference to current positions.
+    pub fn positions(&self) -> &[f64] {
         &self.state.x
     }
 
-    /// Return a reference to last evaluated position.
-    pub fn get_last_position(&self) -> Option<&[f64]> {
+    /// Return a reference to positions of the previous point.
+    pub fn get_last_positions(&self) -> Option<&[f64]> {
         let state = self.last_state.as_ref()?;
         let x = state.x.as_ref();
         Some(x)
     }
 
-    /// Update position `x` at a prescribed displacement.
+    /// Update positions `x` with a prescribed displacement.
     ///
     /// x += displ
     pub fn step_toward(&mut self, displ: &[f64]) {
@@ -174,8 +175,8 @@ where
 
             // update position vector with the displacement
             self.state.x.vecadd(displ, 1.0);
-            self.state.fx = None;
-            self.state.gx = None;
+            self.state.energy = None;
+            self.state.forces = None;
         }
     }
 
@@ -184,19 +185,6 @@ where
         if let Some(ref state) = self.last_state {
             self.state.clone_from(state);
         }
-
-        // if let Some(ref prev) = self.x_prev {
-        //     // revert position
-        //     self.x.clone_from(prev);
-
-        //     // also revert cached results
-        //     self.fx = self.fx_prev;
-        //     if let Some(ref prev) = self.gx_prev {
-        //         if let Some(gx) = self.gx.as_mut() {
-        //             gx.clone_from(prev);
-        //         }
-        //     }
-        // }
     }
 }
 // 1a2ff40a ends here
@@ -208,10 +196,10 @@ fn test_dynamics() -> Result<()> {
 
     const N: usize = 2;
     let mut x = [0.0; N];
-    // f(x, y) = x^2 + y^2
-    let f = |x: &[f64], g: &mut [f64]| {
+    // f(x1, x2) = x1^2 + x2^2
+    let f = |x: &[f64], f: &mut [f64]| {
         for i in 0..N {
-            g[i] = 2.0 * x[i];
+            f[i] = -2.0 * x[i];
         }
         Ok(x.iter().map(|v| v.powi(2)).sum())
     };
@@ -229,19 +217,19 @@ fn test_dynamics() -> Result<()> {
     let fx = pot.get_energy()?;
     assert_relative_eq!(fx, 5.0, epsilon = 1e-5);
     assert_eq!(pot.ncalls(), 2);
-    let gx = pot.get_gradient()?;
-    assert_relative_eq!(gx[0], 2.0, epsilon = 1e-5);
-    assert_relative_eq!(gx[1], 4.0, epsilon = 1e-5);
+    let f = pot.get_forces()?;
+    assert_relative_eq!(f[0], -2.0, epsilon = 1e-5);
+    assert_relative_eq!(f[1], -4.0, epsilon = 1e-5);
     assert_eq!(pot.ncalls(), 2);
     assert_eq!(pot.get_last_energy().unwrap(), 0.0);
-    assert_eq!(pot.get_last_gradient().unwrap()[0], 0.0);
+    assert_eq!(pot.get_last_forces().unwrap()[0], 0.0);
 
     let d = [1.0, 1.0];
     pot.step_toward(&d);
-    assert_eq!(pot.position(), &[2.0, 3.0]);
+    assert_eq!(pot.positions(), &[2.0, 3.0]);
 
     pot.revert();
-    assert_eq!(pot.position(), &[1.0, 2.0]);
+    assert_eq!(pot.positions(), &[1.0, 2.0]);
     assert_eq!(pot.get_energy()?, 5.0);
     assert_eq!(pot.ncalls(), 2);
     assert_eq!(pot.get_last_energy().unwrap(), 5.0);

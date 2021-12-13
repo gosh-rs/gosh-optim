@@ -12,6 +12,7 @@ mod potential;
 mod vars;
 // 2e984082 ends here
 
-// [[file:../optim.note::*pub][pub:1]]
+// [[file:../optim.note::33bebce4][33bebce4]]
 pub use opt::*;
-// pub:1 ends here
+pub use potential::Dynamics;
+// 33bebce4 ends here

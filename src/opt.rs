@@ -89,7 +89,7 @@ where
 }
 // pub/trait:1 ends here
 
-// [[file:../optim.note::*pub/iter][pub/iter:1]]
+// [[file:../optim.note::b17504d6][b17504d6]]
 #[derive(Debug, Clone)]
 /// A helper struct containing information on optimization step.
 pub struct OptimizedIter<U> {
@@ -116,7 +116,7 @@ pub struct OptimizedIter<U> {
 pub fn optimize_geometry_iter<'a, M, U: 'a>(
     mol: &'a mut Molecule,
     model: &'a mut M,
-) -> impl Iterator<Item = OptimizedIter<U>> + 'a
+) -> Box<dyn Iterator<Item = OptimizedIter<U>> + 'a>
 where
     M: OptimizeMolecule<U>,
 {
@@ -126,17 +126,13 @@ where
     let mask = mol.freezing_coords_mask();
     let mut x_init_masked = mask.apply(&coords);
 
-    let mut opt = lbfgs::lbfgs_iter()
-        .with_max_evaluations(vars.max_evaluations)
-        .with_initial_step_size(vars.initial_step_size)
-        .with_max_step_size(vars.max_step_size)
-        .with_max_linesearch(vars.max_linesearch)
-        .with_gradient_only()
-        .with_damping(true)
-        .with_linesearch_gtol(0.999);
+    if vars.algorithm == "FIRE" {
+        info!("Optimizing using FIRE algorithm ...");
+        let mut opt = fire::fire()
+            .with_max_step(vars.max_step_size)
+            .with_max_cycles(vars.max_evaluations);
 
-    let steps = opt
-        .minimize(x_init_masked, move |x_masked: &[f64], o_masked: &mut lbfgs::Output| {
+        let steps = opt.minimize_iter(x_init_masked, move |x_masked: &[f64], o_masked: &mut fire::Output| {
             let positions = mask.unmask(x_masked, 0.0).as_3d().to_owned();
             mol.update_positions(positions);
             let mut out = Output {
@@ -154,22 +150,64 @@ where
 
             let fmax = forces.chunks(3).map(|v| v.vec2norm()).float_max();
             Ok((fmax, extra))
-        })
-        .expect("optimize_geometry_iter");
+        });
 
-    steps.map(|progress| {
-        let (fmax, extra) = progress.extra;
-        OptimizedIter {
-            fmax,
-            extra,
-            ncalls: progress.ncalls,
-            energy: progress.fx,
-        }
-    })
+        Box::new(steps.map(|progress| {
+            let (fmax, extra) = progress.extra;
+            OptimizedIter {
+                fmax,
+                extra,
+                ncalls: progress.ncalls,
+                energy: progress.fx,
+            }
+        }))
+    } else {
+        info!("Optimizing using L-BFGS algorithm ...");
+        let mut opt = lbfgs::lbfgs_iter()
+            .with_max_evaluations(vars.max_evaluations)
+            .with_initial_step_size(vars.initial_step_size)
+            .with_max_step_size(vars.max_step_size)
+            .with_max_linesearch(vars.max_linesearch)
+            .with_gradient_only()
+            .with_damping(true)
+            .with_linesearch_gtol(0.999);
+
+        let steps = opt
+            .minimize(x_init_masked, move |x_masked: &[f64], o_masked: &mut lbfgs::Output| {
+                let positions = mask.unmask(x_masked, 0.0).as_3d().to_owned();
+                mol.update_positions(positions);
+                let mut out = Output {
+                    energy: None,
+                    forces: None,
+                };
+                let extra = model.evaluate(&mol, &mut out)?;
+                let energy = out.energy.expect("evaluate: forget to set energy?");
+                let forces = out.forces.as_ref().expect("evaluate: forget to set forces?");
+                let forces = mask.apply(forces.as_flat());
+                trace!("opt: evaluate PES");
+
+                o_masked.gx.vecncpy(&forces);
+                o_masked.fx = energy;
+
+                let fmax = forces.chunks(3).map(|v| v.vec2norm()).float_max();
+                Ok((fmax, extra))
+            })
+            .expect("optimize_geometry_iter");
+
+        Box::new(steps.map(|progress| {
+            let (fmax, extra) = progress.extra;
+            OptimizedIter {
+                fmax,
+                extra,
+                ncalls: progress.ncalls,
+                energy: progress.fx,
+            }
+        }))
+    }
 }
-// pub/iter:1 ends here
+// b17504d6 ends here
 
-// [[file:../optim.note::*pub/optimize_geometry][pub/optimize_geometry:1]]
+// [[file:../optim.note::315bd793][315bd793]]
 impl Optimizer {
     /// Optimize geometry of `mol` in potential provided by `model`.
     ///
@@ -221,4 +259,4 @@ impl Optimizer {
         Ok(optimized)
     }
 }
-// pub/optimize_geometry:1 ends here
+// 315bd793 ends here

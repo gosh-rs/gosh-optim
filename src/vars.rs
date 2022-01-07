@@ -4,7 +4,7 @@ use serde::*;
 use gosh_core::gut::prelude::*;
 // imports:1 ends here
 
-// [[file:../optim.note::*base][base:1]]
+// [[file:../optim.note::d262eb93][d262eb93]]
 #[derive(Deserialize, Debug, Clone)]
 #[serde(default)]
 pub(crate) struct Vars {
@@ -15,6 +15,8 @@ pub(crate) struct Vars {
     pub initial_step_size: f64,
 
     pub max_evaluations: usize,
+
+    pub algorithm: String,
 }
 
 impl Default for Vars {
@@ -24,6 +26,7 @@ impl Default for Vars {
             initial_step_size: 1.0 / 75.0,
             max_linesearch: 1,
             max_evaluations: 0,
+            algorithm: "LBFGS".into(),
         }
     }
 }
@@ -43,4 +46,4 @@ impl Vars {
         }
     }
 }
-// base:1 ends here
+// d262eb93 ends here

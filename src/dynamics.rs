@@ -5,11 +5,11 @@ use vecfx::*;
 // 899e3829 ends here
 
 // [[file:../optim.note::cc8bb4f6][cc8bb4f6]]
-struct MoleculeDynamics<F: FnMut(&[f64], &mut [f64]) -> Result<f64>> {
-    dynamics: crate::potential::Dynamics<F>,
+pub struct MoleculeDynamics<F: FnMut(&[f64], &mut [f64]) -> Result<f64>> {
+    pub dynamics: crate::potential::Dynamics<F>,
 
-    mass: Vec<f64>,
-    velocity: Vec<f64>,
+    pub mass: Vec<f64>,
+    pub velocity: Vec<f64>,
 }
 // cc8bb4f6 ends here
 
@@ -20,10 +20,11 @@ where
 {
     /// update velocity and positions in Velocity Verlet Algorithm
     fn velocity_verlet_update(&mut self, dt: f64) -> Result<()> {
-        let m = self.mass.as_vector_slice();
         let v = self.velocity.as_vector_slice();
         let r = self.dynamics.positions().as_vector_slice();
         let f = self.dynamics.get_forces()?.as_vector_slice();
+        // m => 3*N
+        let m = self.mass.iter().flat_map(|&m| [m; 3]).collect_vec().to_vector();
 
         // update positions
         let dr = v * dt + 0.5 * f.component_div(&m) * dt.powi(2);

@@ -8,7 +8,7 @@ use gut::prelude::*;
 use vecfx::*;
 // imports:1 ends here
 
-// [[file:../optim.note::*base][base:1]]
+// [[file:../optim.note::5f176b88][5f176b88]]
 use gosh_database::CheckpointDb;
 
 /// A generic interface for geometry optimization of Molecule.
@@ -33,6 +33,8 @@ impl Default for Optimizer {
 impl Optimizer {
     /// New optimizer with max force (fmax) and max step (nmax) in iterations.
     pub fn new(fmax: f64, nmax: usize) -> Self {
+        assert!(fmax.is_sign_positive(), "invalid value of fmax: {:?}", fmax);
+
         Self {
             fmax,
             nmax,
@@ -56,7 +58,7 @@ pub struct Optimized {
     /// Final computed properties in ChemicalModel.
     pub computed: ModelProperties,
 }
-// base:1 ends here
+// 5f176b88 ends here
 
 // [[file:../optim.note::*pub/trait][pub/trait:1]]
 /// A helper struct represents the output data required for molecular geometry

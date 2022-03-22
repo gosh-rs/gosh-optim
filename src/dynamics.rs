@@ -2,14 +2,18 @@
 use super::*;
 
 use vecfx::*;
+use potential::Dynamics;
 // 899e3829 ends here
 
 // [[file:../optim.note::cc8bb4f6][cc8bb4f6]]
-pub struct MoleculeDynamics<F: FnMut(&[f64], &mut [f64]) -> Result<f64>> {
-    pub dynamics: crate::potential::Dynamics<F>,
+pub struct MoleculeDynamics<F>
+where
+    F: FnMut(&[f64], &mut [f64]) -> Result<f64>,
+{
+    dynamics: Dynamics<F>,
 
-    pub mass: Vec<f64>,
-    pub velocity: Vec<f64>,
+    mass: Vec<f64>,
+    velocity: Vec<f64>,
 }
 // cc8bb4f6 ends here
 
@@ -24,6 +28,7 @@ where
         let r = self.dynamics.positions().as_vector_slice();
         let f = self.dynamics.get_forces()?.as_vector_slice();
         // m => 3*N
+        // FIXME: refactor
         let m = self.mass.iter().flat_map(|&m| [m; 3]).collect_vec().to_vector();
 
         // update positions

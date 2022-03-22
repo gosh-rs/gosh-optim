@@ -17,3 +17,22 @@ pub use dynamics::MoleculeDynamics;
 pub use opt::*;
 pub use potential::Dynamics;
 // 33bebce4 ends here
+
+// [[file:../optim.note::242ad86a][242ad86a]]
+#[cfg(feature = "adhoc")]
+/// Docs for local mods
+pub mod docs {
+    macro_rules! export_doc {
+        ($l:ident) => {
+            pub mod $l {
+                pub use crate::$l::*;
+            }
+        };
+    }
+
+    export_doc!(potential);
+    export_doc!(dynamics);
+    export_doc!(opt);
+    export_doc!(vars);
+}
+// 242ad86a ends here

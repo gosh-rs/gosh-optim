@@ -7,7 +7,7 @@ use gosh_core::gut::prelude::*;
 // [[file:../optim.note::d262eb93][d262eb93]]
 #[derive(Deserialize, Debug, Clone)]
 #[serde(default)]
-pub(crate) struct Vars {
+pub struct Vars {
     pub max_step_size: f64,
 
     pub max_linesearch: usize,

@@ -15,4 +15,8 @@ envy = "0.4"
 serde = {version="1", features = ["derive"]}
 
 [dev-dependencies]
+
+[features]
+# for easy development
+adhoc = []
 # eeb92e72 ends here

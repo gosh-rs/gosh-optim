@@ -29,6 +29,8 @@ struct State {
     forces: Option<Vec<f64>>,
 }
 
+
+/// A potential walker for dynamic simulation
 #[derive(Clone, Debug)]
 pub struct Dynamics<E>
 where
@@ -103,7 +105,7 @@ where
     }
 
     /// Set epsilon for determining if structure has any substantial changes. If
-    /// so, the potential will be evaluated automatically.
+    /// so, the potential will be re-evaluated automatically.
     pub fn set_epsilon(&mut self, eps: f64) {
         assert!(eps.is_sign_positive(), "invalid eps: {:?}", eps);
         self.epsilon = eps;

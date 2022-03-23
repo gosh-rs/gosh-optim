@@ -6,14 +6,12 @@ use gut::prelude::*;
 // a74a585a ends here
 
 // [[file:../optim.note::2e984082][2e984082]]
-mod dynamics;
 mod opt;
 mod potential;
 mod vars;
 // 2e984082 ends here
 
 // [[file:../optim.note::33bebce4][33bebce4]]
-pub use dynamics::MoleculeDynamics;
 pub use opt::*;
 pub use potential::Dynamics;
 // 33bebce4 ends here
@@ -31,7 +29,6 @@ pub mod docs {
     }
 
     export_doc!(potential);
-    export_doc!(dynamics);
     export_doc!(opt);
     export_doc!(vars);
 }

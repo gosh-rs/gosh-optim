@@ -31,19 +31,19 @@ fn test_dynamics() -> Result<()> {
     let fx = pot.get_energy()?;
     assert_relative_eq!(fx, 5.0, epsilon = 1e-5);
     assert_eq!(pot.ncalls(), 2);
-    let f = pot.get_forces()?;
+    let f = pot.get_force()?;
     assert_relative_eq!(f[0], -2.0, epsilon = 1e-5);
     assert_relative_eq!(f[1], -4.0, epsilon = 1e-5);
     assert_eq!(pot.ncalls(), 2);
     assert_eq!(pot.get_last_energy().unwrap(), 0.0);
-    assert_eq!(pot.get_last_forces().unwrap()[0], 0.0);
+    assert_eq!(pot.get_last_force().unwrap()[0], 0.0);
 
     let d = [1.0, 1.0];
     pot.step_toward(&d);
-    assert_eq!(pot.positions(), &[2.0, 3.0]);
+    assert_eq!(pot.position(), &[2.0, 3.0]);
 
     pot.revert();
-    assert_eq!(pot.positions(), &[1.0, 2.0]);
+    assert_eq!(pot.position(), &[1.0, 2.0]);
     assert_eq!(pot.get_energy()?, 5.0);
     assert_eq!(pot.ncalls(), 2);
     assert_eq!(pot.get_last_energy().unwrap(), 5.0);

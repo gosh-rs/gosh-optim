@@ -22,6 +22,21 @@ use super::*;
 // cc2b4eb6 ends here
 
 // [[file:../optim.note::9e96c6e5][9e96c6e5]]
+/// Trait for potential evaluation in dynamics simulation
+pub trait EvaluateEnergyForce {
+    /// Return energy and force of potential at current position.
+    fn evaluate(&mut self, position: &[f64], force: &mut [f64]) -> Result<f64>;
+}
+
+impl<T> EvaluateEnergyForce for T
+where
+    T: FnMut(&[f64], &mut [f64]) -> Result<f64>, // position, force => energy
+{
+    fn evaluate(&mut self, position: &[f64], force: &mut [f64]) -> Result<f64> {
+        self(position, force)
+    }
+}
+
 #[derive(Debug, Clone)]
 struct State {
     x: Vec<f64>,
@@ -30,12 +45,8 @@ struct State {
 }
 
 /// A potential walker for dynamic simulation
-#[derive(Clone, Debug)]
-pub struct Dynamics<E>
-where
-    E: FnMut(&[f64], &mut [f64]) -> Result<f64>, // positions, forces => energy
-{
-    f: E,
+pub struct Dynamics<'a> {
+    f: Box<dyn EvaluateEnergyForce + 'a>,
     state: State,
 
     epsilon: f64,
@@ -57,17 +68,14 @@ impl State {
 // 9e96c6e5 ends here
 
 // [[file:../optim.note::51dd1513][51dd1513]]
-impl<E> Dynamics<E>
-where
-    E: FnMut(&[f64], &mut [f64]) -> Result<f64>,
-{
+impl<'a> Dynamics<'a> {
     /// evaluate energy and gradient at current position
     fn eval(&mut self) -> Result<(f64, &[f64])> {
         let n = self.state.x.len();
 
         let force: &mut [f64] = self.state.force.get_or_insert(vec![0.0; n]);
         let x = &self.state.x;
-        let v = (self.f)(x, force)?;
+        let v = self.f.evaluate(x, force)?;
         self.state.energy = Some(v);
 
         self.neval += 1;
@@ -78,10 +86,7 @@ where
 // 51dd1513 ends here
 
 // [[file:../optim.note::1a2ff40a][1a2ff40a]]
-impl<E> Dynamics<E>
-where
-    E: FnMut(&[f64], &mut [f64]) -> Result<f64>,
-{
+impl<'a> Dynamics<'a> {
     /// Construct a Dynamics
     ///
     /// # Parameters
@@ -92,9 +97,9 @@ where
     ///      - the first paramater is the position
     ///      - the second is the force to be updated
     ///      - the return value is the energy
-    pub fn new(x: &[f64], f: E) -> Self {
+    pub fn new(x: &[f64], f: impl EvaluateEnergyForce + 'a) -> Self {
         Dynamics {
-            f,
+            f: Box::new(f),
             epsilon: 1e-8,
             neval: 0,
 

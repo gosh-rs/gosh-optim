@@ -6,21 +6,28 @@ use fire::fire;
 use lbfgs::lbfgs_iter;
 // a197ff17 ends here
 
-// [[file:../optim.note::*base][base:1]]
+// [[file:../optim.note::585fa1e2][585fa1e2]]
 #[derive(Debug, Clone)]
 /// A helper struct containing information on optimization step.
-pub struct OptimizedIter {
+pub struct OptimizedIter<U> {
     /// The number of calls for potential evaluation.
     pub ncalls: usize,
     /// Current fmax criterion of forces in optimization.
     pub fmax: f64,
     /// Current energy in optimization.
     pub energy: f64,
+    /// Extra data returned from user defined OptimizeMolecule trait method
+    pub extra: U,
 }
-// base:1 ends here
+// 585fa1e2 ends here
 
 // [[file:../optim.note::fe25e584][fe25e584]]
-pub fn optimize_geometry_iter<'a>(potential: &'a mut Dynamics) -> Box<dyn Iterator<Item = OptimizedIter> + 'a> {
+pub fn optimize_geometry_iter<'a, U: 'a>(
+    potential: &'a mut Dynamics<U>,
+) -> Box<dyn Iterator<Item = OptimizedIter<U>> + 'a>
+where
+    U: Clone,
+{
     let vars = Vars::from_env();
     if vars.algorithm == "FIRE" {
         info!("Optimizing using FIRE algorithm ...");
@@ -35,8 +42,14 @@ pub fn optimize_geometry_iter<'a>(potential: &'a mut Dynamics) -> Box<dyn Iterat
             o.fx = energy;
             o.gx.vecncpy(force);
             let fmax = force.iter().map(|x| x.abs()).float_max();
+            let extra = potential.get_extra()?.clone();
             let ncalls = potential.ncalls();
-            let progress = OptimizedIter { ncalls, energy, fmax };
+            let progress = OptimizedIter {
+                ncalls,
+                energy,
+                fmax,
+                extra,
+            };
             Ok(progress)
         });
         Box::new(steps.map(|progress| progress.extra))
@@ -52,17 +65,25 @@ pub fn optimize_geometry_iter<'a>(potential: &'a mut Dynamics) -> Box<dyn Iterat
             .with_linesearch_gtol(0.999);
 
         let x_init = potential.position().to_vec();
-        let steps = opt.minimize(x_init, move |x: &[f64], o: &mut lbfgs::Output| {
-            potential.set_position(x);
-            let energy = potential.get_energy()?;
-            let force = potential.get_force()?;
-            o.fx = energy;
-            o.gx.vecncpy(force);
-            let fmax = force.iter().map(|x| x.abs()).float_max();
-            let ncalls = potential.ncalls();
-            let progress = OptimizedIter { ncalls, energy, fmax };
-            Ok(progress)
-        }).expect("optimize lbfgs");
+        let steps = opt
+            .minimize(x_init, move |x: &[f64], o: &mut lbfgs::Output| {
+                potential.set_position(x);
+                let energy = potential.get_energy()?;
+                let force = potential.get_force()?;
+                o.fx = energy;
+                o.gx.vecncpy(force);
+                let fmax = force.iter().map(|x| x.abs()).float_max();
+                let ncalls = potential.ncalls();
+                let extra = potential.get_extra()?.clone();
+                let progress = OptimizedIter {
+                    ncalls,
+                    fmax,
+                    energy,
+                    extra,
+                };
+                Ok(progress)
+            })
+            .expect("optimize lbfgs");
         Box::new(steps.map(|progress| progress.extra))
     }
 }

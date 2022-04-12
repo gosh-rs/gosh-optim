@@ -60,7 +60,7 @@ pub struct Optimized {
 }
 // 5f176b88 ends here
 
-// [[file:../optim.note::*pub/trait][pub/trait:1]]
+// [[file:../optim.note::41861a95][41861a95]]
 /// A helper struct represents the output data required for molecular geometry
 /// optimization.
 pub struct Output {
@@ -89,7 +89,7 @@ where
         Ok(mp)
     }
 }
-// pub/trait:1 ends here
+// 41861a95 ends here
 
 // [[file:../optim.note::b17504d6][b17504d6]]
 #[derive(Debug, Clone)]

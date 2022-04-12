@@ -14,7 +14,7 @@ mod vars;
 
 // [[file:../optim.note::33bebce4][33bebce4]]
 pub use opt::*;
-pub use potential::{Dynamics, EvaluateEnergyForce};
+pub use potential::{Dynamics, EvaluatePotential, PotentialOutput};
 // 33bebce4 ends here
 
 // [[file:../optim.note::242ad86a][242ad86a]]

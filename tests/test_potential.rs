@@ -2,7 +2,7 @@
 use gosh_core::*;
 use gut::prelude::*;
 
-use gosh_optim::Dynamics;
+use gosh_optim::{Dynamics, PotentialOutput};
 
 #[test]
 fn test_dynamics() -> Result<()> {
@@ -15,7 +15,8 @@ fn test_dynamics() -> Result<()> {
         for i in 0..N {
             f[i] = -2.0 * x[i];
         }
-        Ok(x.iter().map(|v| v.powi(2)).sum())
+        let fx = x.iter().map(|v| v.powi(2)).sum();
+        Ok(fx)
     };
 
     let mut pot = Dynamics::new(&x, f);

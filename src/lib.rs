@@ -7,6 +7,7 @@ use gut::prelude::*;
 
 // [[file:../optim.note::2e984082][2e984082]]
 mod opt;
+mod optimization;
 mod potential;
 mod vars;
 // 2e984082 ends here

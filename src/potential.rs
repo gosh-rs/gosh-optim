@@ -120,6 +120,11 @@ impl<'a> Dynamics<'a> {
         self.neval
     }
 
+    /// Reset counter for potential evaluations to zero.
+    pub fn recount(&mut self) {
+        self.neval = 0;
+    }
+
     /// Return energy at current position if ok.
     ///
     /// The function will be evaluated when necessary.

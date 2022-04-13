@@ -9,22 +9,21 @@ use lbfgs::lbfgs_iter;
 // [[file:../optim.note::585fa1e2][585fa1e2]]
 #[derive(Debug, Clone)]
 /// A helper struct containing information on optimization step.
-pub struct OptimizedIter<U> {
+pub struct OptimProgress<U> {
     /// The number of calls for potential evaluation.
     pub ncalls: usize,
     /// Current fmax criterion of forces in optimization.
     pub fmax: f64,
     /// Current energy in optimization.
     pub energy: f64,
-    /// Extra data returned from user defined OptimizeMolecule trait method
+    /// Extra data returned from user defined in `EvaluatePotential` trait method
     pub extra: U,
 }
 // 585fa1e2 ends here
 
 // [[file:../optim.note::fe25e584][fe25e584]]
-pub fn optimize_geometry_iter<'a, U: 'a>(
-    potential: &'a mut Dynamics<U>,
-) -> Box<dyn Iterator<Item = OptimizedIter<U>> + 'a>
+/// A general interface for optimization of potential energy
+pub fn optimize<'a, U: 'a>(potential: &'a mut Dynamics<U>) -> Box<dyn Iterator<Item = OptimProgress<U>> + 'a>
 where
     U: Clone,
 {
@@ -44,7 +43,7 @@ where
             let fmax = force.iter().map(|x| x.abs()).float_max();
             let extra = potential.get_extra()?.clone();
             let ncalls = potential.ncalls();
-            let progress = OptimizedIter {
+            let progress = OptimProgress {
                 ncalls,
                 energy,
                 fmax,
@@ -75,7 +74,7 @@ where
                 let fmax = force.iter().map(|x| x.abs()).float_max();
                 let ncalls = potential.ncalls();
                 let extra = potential.get_extra()?.clone();
-                let progress = OptimizedIter {
+                let progress = OptimProgress {
                     ncalls,
                     fmax,
                     energy,

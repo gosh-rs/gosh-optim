@@ -22,12 +22,10 @@ fn test_dynamics() -> Result<()> {
     let mut pot = Dynamics::new(&x, f);
     let fx = pot.get_energy()?;
     assert_relative_eq!(fx, 0.0, epsilon = 1e-5);
-    assert!(pot.get_last_energy().is_none());
 
     let d = [1.0, 2.0];
     pot.step_toward(&d);
     assert_eq!(pot.ncalls(), 1);
-    assert_eq!(pot.get_last_energy().unwrap(), 0.0);
 
     let fx = pot.get_energy()?;
     assert_relative_eq!(fx, 5.0, epsilon = 1e-5);
@@ -36,18 +34,15 @@ fn test_dynamics() -> Result<()> {
     assert_relative_eq!(f[0], -2.0, epsilon = 1e-5);
     assert_relative_eq!(f[1], -4.0, epsilon = 1e-5);
     assert_eq!(pot.ncalls(), 2);
-    assert_eq!(pot.get_last_energy().unwrap(), 0.0);
-    assert_eq!(pot.get_last_force().unwrap()[0], 0.0);
 
     let d = [1.0, 1.0];
-    pot.step_toward(&d);
-    assert_eq!(pot.position(), &[2.0, 3.0]);
+    pot.set_position(&d);
+    assert_eq!(pot.position(), &[1.0, 1.0]);
 
-    pot.revert();
-    assert_eq!(pot.position(), &[1.0, 2.0]);
-    assert_eq!(pot.get_energy()?, 5.0);
-    assert_eq!(pot.ncalls(), 2);
-    assert_eq!(pot.get_last_energy().unwrap(), 5.0);
+    pot.set_epsilon(0.1);
+    let d = [1.01, 1.01];
+    pot.set_position(&d);
+    assert_eq!(pot.position(), &[1.0, 1.0]);
 
     Ok(())
 }

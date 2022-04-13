@@ -1,4 +1,4 @@
-// [[file:../optim.note::*docs][docs:2]]
+// [[file:../optim.note::9f093b0e][9f093b0e]]
 /// Represents an optimization problem with cache for avoiding unnecessary
 /// function re-evaluations.
 ///
@@ -11,11 +11,8 @@
 /// pot.step_toward(&d);
 /// let energy = pot.get_energy()?;
 /// let force = pot.get_force()?;
-/// let energy_old = pot.get_last_energy();
-/// let force_old = pot.get_last_force();
-/// pot.revert();
 /// ```
-// docs:2 ends here
+// 9f093b0e ends here
 
 // [[file:../optim.note::cc2b4eb6][cc2b4eb6]]
 use super::*;
@@ -70,7 +67,6 @@ pub struct Dynamics<'a, U> {
 
     state: State,
     // cache previous point
-    last_state: Option<State>,
     epsilon: f64,
     neval: usize,
 
@@ -112,7 +108,6 @@ impl<'a, U> Dynamics<'a, U> {
             neval: 0,
 
             state: State::new(x),
-            last_state: None,
             user_data: None,
         }
     }
@@ -181,10 +176,7 @@ impl<'a, U> Dynamics<'a, U> {
 // c39f75c1 ends here
 
 // [[file:../optim.note::1a2ff40a][1a2ff40a]]
-impl<'a, U> Dynamics<'a, U>
-where
-    U: Clone,
-{
+impl<'a, U> Dynamics<'a, U> {
     /// Set epsilon for determining if structure has any substantial changes. If
     /// so, the potential will be re-evaluated automatically.
     pub fn set_epsilon(&mut self, eps: f64) {
@@ -192,50 +184,35 @@ where
         self.epsilon = eps;
     }
 
-    /// Return energy at previous position if any
-    pub fn get_last_energy(&self) -> Option<f64> {
-        self.last_state.as_ref()?.evaluated.as_ref()?.energy.into()
-    }
-
-    /// Return a reference to force at previous point.
-    pub fn get_last_force(&self) -> Option<&[f64]> {
-        let force = &self.last_state.as_ref()?.evaluated.as_ref()?.force;
-        Some(force)
-    }
-
-    /// Return a reference to position of the previous point.
-    pub fn get_last_position(&self) -> Option<&[f64]> {
-        let x = &self.last_state.as_ref()?.position.as_ref();
-        Some(x)
+    /// The threshold for updating current position.
+    pub fn epsilon(&self) -> f64 {
+        self.epsilon
     }
 
     /// Update position `x` with a prescribed displacement.
     ///
-    /// x += displ
-    pub fn step_toward(&mut self, displ: &[f64]) {
+    /// x += displacement
+    pub fn step_toward(&mut self, displacement: &[f64]) {
         // position changed
-        if displ.as_vector_slice().norm() > self.epsilon {
-            // update previous point
-            self.last_state = self.state.clone().into();
-
+        let step_size = displacement.as_vector_slice().norm();
+        if step_size > self.epsilon {
             // update position vector with the displacement
-            self.state.position.vecadd(displ, 1.0);
+            self.state.position.vecadd(displacement, 1.0);
             self.state.evaluated = None;
+        } else {
+            info!("step size is too small: {step_size}, ignored.");
         }
     }
 
     /// Set current position directly.
     pub fn set_position(&mut self, position: &[f64]) {
         assert_eq!(position.len(), self.state.position.len());
-        self.last_state = self.state.clone().into();
-        self.state.position.clone_from_slice(position);
-        self.state.evaluated = None;
-    }
-
-    /// Revert to previous point if possible
-    pub fn revert(&mut self) {
-        if let Some(ref state) = self.last_state {
-            self.state.clone_from(state);
+        let step_size = (position.as_vector_slice() - self.state.position.as_vector_slice()).norm();
+        if step_size > self.epsilon {
+            self.state.position.clone_from_slice(position);
+            self.state.evaluated = None;
+        } else {
+            info!("step size is too small: {step_size}, ignored.");
         }
     }
 }

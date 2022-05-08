@@ -1,4 +1,4 @@
-// [[file:../optim.note::*test][test:1]]
+// [[file:../optim.note::f15831bf][f15831bf]]
 use gosh_core::*;
 use gut::prelude::*;
 
@@ -21,6 +21,7 @@ fn test_opt() -> Result<()> {
     for p in steps.take(10) {
         dbg!(p.fmax, p.ncalls);
     }
+
     Ok(())
 }
-// test:1 ends here
+// f15831bf ends here

@@ -16,3 +16,4 @@ Cargo.lock
 *.note
 *.note_archive
 /ltximg/
+/data

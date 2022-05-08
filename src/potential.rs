@@ -216,4 +216,31 @@ impl<'a, U> Dynamics<'a, U> {
         }
     }
 }
+
+impl<'a> Dynamics<'a, ()> {
+    /// Create `Dynamics` for molecule simulation using chemical model `model`.
+    pub fn from_chemical_model(
+        model: &'a mut impl gosh_model::ChemicalModel,
+        mut mol: gchemol::Molecule,
+    ) -> Dynamics<()> {
+        // handle freezing atoms/coords
+        let position = mol.positions().flatten().collect_vec();
+        let mask = mol.freezing_coords_mask();
+        let position_opt = mask.apply(&position);
+        info!("Removed {} freezing coordinates", position.len() - position_opt.len());
+        Self::new(&position_opt, move |x_masked: &[f64], force: &mut [f64]| {
+            let x = mask.unmask(x_masked, 0.0);
+            mol.update_positions(x.as_3d().into_iter().copied());
+            let mp = model.compute(&mol)?;
+            let f = mp.get_forces().ok_or(format_err!("no forces"))?;
+            let e = mp.get_energy().ok_or(format_err!("no energy"))?;
+            // remove any contribution from freezing coords
+            let f_masked = mask.apply(f.as_flat());
+            assert_eq!(force.len(), f_masked.len(), "invalid mp: {mp:?}");
+            force.copy_from_slice(&f_masked);
+
+            Ok(e)
+        })
+    }
+}
 // 1a2ff40a ends here

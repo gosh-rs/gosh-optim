@@ -4,17 +4,22 @@ name = "gosh-optim"
 version = "0.1.0"
 edition = "2021"
 authors = ["Wenping Guo <ybyygu@gmail.com>"]
+description = "geometry optimization interface for gosh"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 gosh-core = { version = "0.1.0", features=["adhoc"] }
 gosh-database = { version = "0.1", features=["adhoc"] }
 gosh-model = { version = "0.1", features=["adhoc"] }
-lbfgs = { version = "0.0.18", package="liblbfgs" }
+lbfgs = { version = "0.1", package="gosh-lbfgs" }
 fire = { version = "0.1", package="gosh-fire" }
 envy = "0.4"
 serde = {version="1", features = ["derive"]}
 
 [dev-dependencies]
+
+# workspace independent
+[workspace]
 
 [features]
 # for easy development

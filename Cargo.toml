@@ -1,7 +1,7 @@
 # [[file:optim.note::eeb92e72][eeb92e72]]
 [package]
 name = "gosh-optim"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Wenping Guo <ybyygu@gmail.com>"]
 description = "geometry optimization interface for gosh"
@@ -13,13 +13,14 @@ gosh-database = { version = "0.1", features=["adhoc"] }
 gosh-model = { version = "0.1", features=["adhoc"] }
 lbfgs = { version = "0.1", package="gosh-lbfgs" }
 fire = { version = "0.1", package="gosh-fire" }
+dimer = { version = "0.2", package="gosh-dimer" }
 envy = "0.4"
 serde = {version="1", features = ["derive"]}
 
 [dev-dependencies]
 
 # workspace independent
-[workspace]
+# [workspace]
 
 [features]
 # for easy development

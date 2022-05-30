@@ -36,3 +36,25 @@ pub mod docs {
     export_doc!(vars);
 }
 // 242ad86a ends here
+
+// [[file:../optim.note::5e6f19c8][5e6f19c8]]
+pub use dimer::Dimer;
+
+impl<'a, U> dimer::EvaluateDimer for Dynamics<'a, U> {
+    fn position(&self) -> &[f64] {
+        self.position()
+    }
+
+    fn set_position(&mut self, position: &[f64]) {
+        self.set_position(position);
+    }
+
+    fn get_energy(&mut self) -> Result<f64> {
+        self.get_energy()
+    }
+
+    fn get_force(&mut self) -> Result<&[f64]> {
+        self.get_force()
+    }
+}
+// 5e6f19c8 ends here

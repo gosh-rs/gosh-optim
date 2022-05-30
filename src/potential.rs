@@ -195,6 +195,7 @@ impl<'a, U> Dynamics<'a, U> {
     pub fn step_toward(&mut self, displacement: &[f64]) {
         // position changed
         let step_size = displacement.as_vector_slice().norm();
+        assert!(step_size.is_nan(), "found invalid float numbers: {displacement:?}");
         if step_size > self.epsilon {
             // update position vector with the displacement
             self.state.position.vecadd(displacement, 1.0);
@@ -208,6 +209,11 @@ impl<'a, U> Dynamics<'a, U> {
     pub fn set_position(&mut self, position: &[f64]) {
         assert_eq!(position.len(), self.state.position.len());
         let step_size = (position.as_vector_slice() - self.state.position.as_vector_slice()).norm();
+        assert!(
+            step_size.is_nan(),
+            "found invalid float numbers: {position:?} or {:?}",
+            self.state.position
+        );
         if step_size > self.epsilon {
             self.state.position.clone_from_slice(position);
             self.state.evaluated = None;
@@ -216,7 +222,9 @@ impl<'a, U> Dynamics<'a, U> {
         }
     }
 }
+// 1a2ff40a ends here
 
+// [[file:../optim.note::b4c9a7de][b4c9a7de]]
 impl<'a> Dynamics<'a, ()> {
     /// Create `Dynamics` for molecule simulation using chemical model `model`.
     pub fn from_chemical_model(
@@ -243,4 +251,4 @@ impl<'a> Dynamics<'a, ()> {
         })
     }
 }
-// 1a2ff40a ends here
+// b4c9a7de ends here

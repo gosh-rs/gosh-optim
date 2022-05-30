@@ -1,4 +1,5 @@
-// [[file:../optim.note::*imports][imports:1]]
+// [[file:../optim.note::a0979185][a0979185]]
+use super::*;
 use gosh_core::*;
 
 use gosh_model::{ChemicalModel, ModelProperties};
@@ -6,7 +7,7 @@ use gosh_model::{ChemicalModel, ModelProperties};
 use gchemol::Molecule;
 use gut::prelude::*;
 use vecfx::*;
-// imports:1 ends here
+// a0979185 ends here
 
 // [[file:../optim.note::5f176b88][5f176b88]]
 use gosh_database::CheckpointDb;
@@ -150,7 +151,7 @@ where
             o_masked.gx.vecncpy(&forces);
             o_masked.fx = energy;
 
-            let fmax = forces.chunks(3).map(|v| v.vec2norm()).float_max();
+            let fmax = f3max_(forces.chunks(3));
             Ok((fmax, extra))
         });
 
@@ -191,7 +192,7 @@ where
                 o_masked.gx.vecncpy(&forces);
                 o_masked.fx = energy;
 
-                let fmax = forces.chunks(3).map(|v| v.vec2norm()).float_max();
+                let fmax = f3max_(forces.chunks(3));
                 Ok((fmax, extra))
             })
             .expect("optimize_geometry_iter");

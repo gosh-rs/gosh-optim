@@ -40,7 +40,7 @@ where
             let force = potential.get_force()?;
             o.fx = energy;
             o.gx.vecncpy(force);
-            let fmax = force.iter().map(|x| x.abs()).float_max();
+            let fmax = fmax_(force);
             let extra = potential.get_extra()?.clone();
             let ncalls = potential.ncalls();
             let progress = OptimProgress {
@@ -71,7 +71,7 @@ where
                 let force = potential.get_force()?;
                 o.fx = energy;
                 o.gx.vecncpy(force);
-                let fmax = force.iter().map(|x| x.abs()).float_max();
+                let fmax = fmax_(force);
                 let ncalls = potential.ncalls();
                 let extra = potential.get_extra()?.clone();
                 let progress = OptimProgress {

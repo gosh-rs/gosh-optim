@@ -12,6 +12,20 @@ mod potential;
 mod vars;
 // 2e984082 ends here
 
+// [[file:../optim.note::135c17fa][135c17fa]]
+fn fmax_<'a>(values: impl IntoIterator<Item = &'a f64>) -> f64 {
+    let fmax = values.into_iter().map(|x| x.abs()).float_max();
+    assert!(!fmax.is_nan(), "found invalid float numbers");
+    fmax
+}
+
+fn f3max_<'a>(values: impl IntoIterator<Item = &'a [f64]>) -> f64 {
+    let fmax = values.into_iter().map(|v| v.vec2norm()).float_max();
+    assert!(!fmax.is_nan(), "found invalid float numbers");
+    fmax
+}
+// 135c17fa ends here
+
 // [[file:../optim.note::33bebce4][33bebce4]]
 pub use opt::*;
 pub use potential::{Dynamics, EvaluatePotential, PotentialOutput};

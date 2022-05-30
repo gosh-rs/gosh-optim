@@ -195,7 +195,7 @@ impl<'a, U> Dynamics<'a, U> {
     pub fn step_toward(&mut self, displacement: &[f64]) {
         // position changed
         let step_size = displacement.as_vector_slice().norm();
-        assert!(step_size.is_nan(), "found invalid float numbers: {displacement:?}");
+        assert!(!step_size.is_nan(), "found invalid float numbers: {displacement:?}");
         if step_size > self.epsilon {
             // update position vector with the displacement
             self.state.position.vecadd(displacement, 1.0);
@@ -210,7 +210,7 @@ impl<'a, U> Dynamics<'a, U> {
         assert_eq!(position.len(), self.state.position.len());
         let step_size = (position.as_vector_slice() - self.state.position.as_vector_slice()).norm();
         assert!(
-            step_size.is_nan(),
+            !step_size.is_nan(),
             "found invalid float numbers: {position:?} or {:?}",
             self.state.position
         );
